@@ -302,8 +302,6 @@ void feh_wm_set_bg(char *fil, Imlib_Image im, int centered, int scaled,
 		fehbg_args[0] = '\0';
 		char *home;
 		char filbuf[4096];
-		char *bgfill = NULL;
-		bgfill = opt.image_bg == IMAGE_BG_WHITE ?  "--image-bg white" : "--image-bg black" ;
 
 #ifdef HAVE_LIBXINERAMA
 		if (opt.xinerama) {
@@ -315,6 +313,20 @@ void feh_wm_set_bg(char *fil, Imlib_Image im, int centered, int scaled,
 		else
 			snprintf(fehbg_args, sizeof(fehbg_args), "--no-xinerama");
 #endif			/* HAVE_LIBXINERAMA */
+
+		char *bgfill = NULL;
+		if(strlen((char*) opt.image_bg) <= 7) {
+			bgfill = emalloc(sizeof("--image-bg") + sizeof(opt.image_bg));
+			sprintf(bgfill, "--image-bg %s", opt.image_bg);
+		}
+
+		/* get a integer value for the custom color, if passed */
+		XColor color;
+		if(strcmp(opt.image_bg, IMAGE_BG_WHITE) &&
+				strcmp(opt.image_bg, IMAGE_BG_BLACK)) {
+			Colormap cmap = DefaultColormap(disp, DefaultScreen(disp));
+			XAllocNamedColor(disp, cmap, (char*) opt.image_bg, &color, &color);
+		}
 
 		/* local display to set closedownmode on */
 		Display *disp2;
@@ -395,10 +407,12 @@ void feh_wm_set_bg(char *fil, Imlib_Image im, int centered, int scaled,
 			D(("centering\n"));
 
 			pmap_d1 = XCreatePixmap(disp, root, scr->width, scr->height, depth);
-			if (opt.image_bg == IMAGE_BG_WHITE)
+			if (!strcmp(opt.image_bg, IMAGE_BG_WHITE))
 				gcval.foreground = WhitePixel(disp, DefaultScreen(disp));
-			else
+			else if (!strcmp(opt.image_bg, IMAGE_BG_BLACK))
 				gcval.foreground = BlackPixel(disp, DefaultScreen(disp));
+			else
+				gcval.foreground = color.pixel;
 			gc = XCreateGC(disp, root, GCForeground, &gcval);
 			XFillRectangle(disp, pmap_d1, gc, 0, 0, scr->width, scr->height);
 
@@ -455,10 +469,12 @@ void feh_wm_set_bg(char *fil, Imlib_Image im, int centered, int scaled,
 		} else if (filled == 2) {
 
 			pmap_d1 = XCreatePixmap(disp, root, scr->width, scr->height, depth);
-			if (opt.image_bg == IMAGE_BG_WHITE)
+			if (!strcmp(opt.image_bg, IMAGE_BG_WHITE))
 				gcval.foreground = WhitePixel(disp, DefaultScreen(disp));
-			else
+			else if (strcmp(opt.image_bg, IMAGE_BG_BLACK))
 				gcval.foreground = BlackPixel(disp, DefaultScreen(disp));
+			else
+				gcval.foreground = color.pixel;
 			gc = XCreateGC(disp, root, GCForeground, &gcval);
 			XFillRectangle(disp, pmap_d1, gc, 0, 0, scr->width, scr->height);
 
@@ -511,8 +527,10 @@ void feh_wm_set_bg(char *fil, Imlib_Image im, int centered, int scaled,
 				free(path);
 			}
 		}
-		
+
 		free(fehbg);
+
+		free(bgfill);
 
 		/* create new display, copy pixmap to new display */
 		disp2 = XOpenDisplay(NULL);
@@ -553,7 +571,7 @@ void feh_wm_set_bg(char *fil, Imlib_Image im, int centered, int scaled,
 
 		if (data_root)
 			XFree(data_root);
-	
+
 		if (data_esetroot)
 			XFree(data_esetroot);
 
